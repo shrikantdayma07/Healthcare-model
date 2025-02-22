@@ -1,0 +1,214 @@
+## CODE FOR HEART RATE PREDICTION USING MACHINE LEARNING :
+=========================================================
+
+1] index.html -->> used to create the UI 
+========================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Disease Prediction</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 600px;
+            margin-top: 50px;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .btn-custom {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-custom:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 class="text-center">Heart Disease Prediction</h2>
+    <form action="/predict" method="post">
+        <div class="mb-3">
+            <label class="form-label">Age</label>
+            <input type="number" name="age" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Sex (1=Male, 0=Female)</label>
+            <input type="number" name="sex" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Chest Pain Type (0-3)</label>
+            <input type="number" name="cp" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Resting Blood Pressure</label>
+            <input type="number" name="trestbps" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Cholesterol</label>
+            <input type="number" name="chol" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Fasting Blood Sugar (1=Yes, 0=No)</label>
+            <input type="number" name="fbs" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Rest ECG (0-2)</label>
+            <input type="number" name="restecg" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Max Heart Rate</label>
+            <input type="number" name="thalach" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Exercise Induced Angina (1=Yes, 0=No)</label>
+            <input type="number" name="exang" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Oldpeak (ST Depression)</label>
+            <input type="number" step="0.1" name="oldpeak" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Slope (0-2)</label>
+            <input type="number" name="slope" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">CA (0-4)</label>
+            <input type="number" name="ca" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Thal (0-3)</label>
+            <input type="number" name="thal" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-custom w-100">Predict</button>
+    </form>
+
+    {% if prediction_text %}
+        <div class="alert alert-info mt-3">{{ prediction_text }}</div>
+    {% endif %}
+</div>
+
+</body>
+</html>
+
+========================================================================
+
+2] model_training.py -->> used to train the dataset!!
+====================================================
+
+
+import pandas as pd
+import numpy as np
+import pickle
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+# Load dataset
+df = pd.read_csv("heart.csv")  # Make sure 'heart.csv' is in the same folder
+
+# Define features and target
+X = df.drop(columns=["target"])  # All columns except 'target'
+y = df["target"]  # Target column
+
+# Split dataset into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Standardize feature values (important for improving model accuracy)
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Train Random Forest model with better parameters
+model = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42)
+model.fit(X_train_scaled, y_train)
+
+# Evaluate model
+y_pred = model.predict(X_test_scaled)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"✅ Model Accuracy: {accuracy * 100:.2f}%")
+
+# Save model and scaler
+with open("heart_disease_model.pkl", "wb") as model_file:
+    pickle.dump(model, model_file)
+
+with open("scaler.pkl", "wb") as scaler_file:
+    pickle.dump(scaler, scaler_file)
+
+print("✅ Model and scaler saved successfully!")
+
+==============================================
+
+3] app.py -->> used to create the UI using the flask !! 
+=======================================================
+
+import os
+import pickle
+import numpy as np
+from flask import Flask, render_template, request
+
+# Initialize Flask app
+app = Flask(__name__, template_folder="templates")
+
+# Load the trained model and scaler
+MODEL_PATH = "heart_disease_model.pkl"
+SCALER_PATH = "scaler.pkl"
+
+if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
+    with open(MODEL_PATH, "rb") as model_file:
+        model = pickle.load(model_file)
+
+    with open(SCALER_PATH, "rb") as scaler_file:
+        scaler = pickle.load(scaler_file)
+else:
+    print("❌ Error: Model or scaler file not found!")
+    model = None
+    scaler = None
+
+@app.route('/')
+def home():
+    return render_template("index.html")
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    if model is None or scaler is None:
+        return "❌ Model or Scaler not found! Please check the server setup.", 500
+
+    try:
+        # Get input values from the form
+        features = [float(request.form[field]) for field in [
+            "age", "sex", "cp", "trestbps", "chol", "fbs", "restecg",
+            "thalach", "exang", "oldpeak", "slope", "ca", "thal"
+        ]]
+
+        # Convert inputs into a NumPy array and scale it
+        input_data = np.array([features])
+        input_scaled = scaler.transform(input_data)
+
+        # Make prediction
+        prediction = model.predict(input_scaled)
+
+        # Interpret the result
+        result = "Heart Disease Detected ❌" if prediction[0] == 1 else "No Heart Disease ✅"
+
+        return render_template("index.html", prediction_text=result)
+
+    except Exception as e:
+        return f"❌ Error: {str(e)}", 400
+
+if __name__ == '__main__':
+    print("✅ Running Flask App...")
+    app.run(debug=True)
+
+=================================================================================================
